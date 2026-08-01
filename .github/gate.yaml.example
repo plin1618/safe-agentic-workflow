@@ -1,0 +1,26 @@
+# Path denylist for the conditional auto-merge gate (Component 2, condition d).
+# A PR touching any of these paths, or exceeding max_files_changed, never
+# auto-merges regardless of CI/mergeable/QAS status -- it's left for manual
+# review instead. Fails closed if this file is missing or unreadable.
+#
+# Seeded with generic security-sensitive defaults. Add this project's own
+# highest-stakes paths below -- for a tax-precision codebase, that's the
+# calculation/rounding logic and anything migration-adjacent, not just
+# secrets and auth.
+
+denylist:
+  - "**/migrations/**"
+  - "**/*_key*"
+  - "**/*_secret*"
+  - ".env*"
+  - "**/secrets/**"
+  - "**/credentials/**"
+  - "**/auth/**"
+  - "**/payments/**"
+  - "**/billing/**"
+  # Project-specific additions -- example for a tax-calc codebase, edit
+  # to match this repo's actual structure before relying on this:
+  # - "src/calc/**"
+  # - "**/rounding/**"
+
+max_files_changed: 10
