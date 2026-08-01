@@ -1,0 +1,52 @@
+name: Conditional Auto-Merge Gate
+
+# Re-checks on PR updates (mergeable state, new commits) and on new comments
+# (to catch QAS's "Approved for RTE" evidence landing after the PR exists).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read
+
+jobs:
+  auto-merge-gate:
+    # issue_comment fires for both issues and PRs; only proceed for PR comments
+    if: github.event_name == 'pull_request' || github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine PR number
+        id: pr
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests pyyaml
+
+      - name: Run gate check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LINEAR_TICKET_PREFIX: ${{ vars.LINEAR_TICKET_PREFIX }}
+          MERGE_METHOD: ${{ vars.MERGE_METHOD || 'squash' }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          # Template default is DRY_RUN=true so a freshly-installed copy of
+          # this workflow never auto-merges before you've validated it
+          # against real PRs. Flip the DRY_RUN repo variable to "false"
+          # once you've compared its verdicts to your own judgment.
+          DRY_RUN: ${{ vars.DRY_RUN || 'true' }}
+        run: python .github/scripts/auto_merge_gate.py
