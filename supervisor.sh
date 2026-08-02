@@ -12,6 +12,10 @@
 #   - audit-tally.json reports production_ready: true, or
 #   - every cluster is parked awaiting the attention queue (nothing left to
 #     do without you), or
+#   - state has stopped changing for STALL_LIMIT consecutive invocations --
+#     covers the case nothing_unblocked_left() can't see: everything got
+#     blocked BEFORE any clustering happened, so cluster-status.json never
+#     existed and that check never fires (see stall detection below), or
 #   - the cumulative circuit breaker in run-ledger.json trips (Component 4.3)
 #
 # Automatically waits out Claude's usage-limit window and resumes without
@@ -49,6 +53,7 @@ MAX_BUDGET_USD="${SUPERVISOR_MAX_BUDGET_USD:-}"          # unset by default -- s
 MAX_ITERATIONS="${SUPERVISOR_MAX_ITERATIONS:-100}"       # cumulative breaker condition (c)
 MAX_CONSECUTIVE_FAILURES="${SUPERVISOR_MAX_CONSECUTIVE_FAILURES:-5}"
 MAX_SAME_ERROR_STREAK="${SUPERVISOR_MAX_SAME_ERROR_STREAK:-5}"
+STALL_LIMIT="${SUPERVISOR_STALL_LIMIT:-2}"               # consecutive no-change invocations before stopping
 
 # Only matters for a genuinely fresh kickoff (no audit-tally.json yet).
 # Once state exists, the loop is fully state-driven and this is ignored.
@@ -146,6 +151,17 @@ production_ready() {
     [[ "$(python -c "import json; print(json.load(open('$AUDIT_TALLY')).get('production_ready', False))" 2>/dev/null)" == "True" ]]
 }
 
+# Fingerprint of everything a session could have changed. Two consecutive
+# invocations producing an identical hash means nothing happened -- the
+# session looked, found nothing new to cluster/build/park, and exited.
+# That's the stall signal nothing_unblocked_left() misses when
+# cluster-status.json never got created in the first place (e.g. every
+# finding from an audit was blocked pre-clustering, so there was never
+# anything to cluster).
+state_hash() {
+  cat "$AUDIT_TALLY" "$CLUSTER_STATUS" "$ATTENTION_QUEUE" 2>/dev/null | md5sum | cut -d' ' -f1
+}
+
 # Everything either "complete" or "parked_*" -- nothing "in_progress" or
 # unstarted left for a fresh invocation to pick up.
 nothing_unblocked_left() {
@@ -222,6 +238,9 @@ there."
     FIRST_INSTRUCTION=""
   fi
 
+  STALL_COUNT=0
+  PREV_STATE_HASH="$(state_hash)"
+
   while true; do
     if production_ready; then
       log "production_ready: true — stopping. Two consecutive clean audits reached."
@@ -290,6 +309,19 @@ than stopping." \
       trip_and_stop "${TRIP_RESULT#TRIPPED:}"
       break
     fi
+
+    NEW_STATE_HASH="$(state_hash)"
+    if [[ "$NEW_STATE_HASH" == "$PREV_STATE_HASH" ]]; then
+      STALL_COUNT=$((STALL_COUNT + 1))
+      log "No change in audit-tally/cluster-status/attention-queue this cycle (stall $STALL_COUNT/$STALL_LIMIT)."
+      if [[ "$STALL_COUNT" -ge "$STALL_LIMIT" ]]; then
+        log "State unchanged for $STALL_LIMIT consecutive invocations — nothing left to do without you. Stopping. Check $ATTENTION_QUEUE for anything pending your decision."
+        break
+      fi
+    else
+      STALL_COUNT=0
+    fi
+    PREV_STATE_HASH="$NEW_STATE_HASH"
 
     log "Session cycle complete. Looping immediately to pick up more work."
   done
