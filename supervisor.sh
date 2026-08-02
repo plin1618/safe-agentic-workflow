@@ -68,11 +68,36 @@ log() {
 }
 
 # --- auth-mode pre-flight check (informational, not enforced) --------------
+# Checks for the two ways this run can end up NOT talking to real Claude:
+# an explicit ANTHROPIC_API_KEY (real per-token billing), or a third-party
+# base-URL/model override (e.g. an OpenRouter proxy config) that silently
+# routes claude -p at a different provider/model entirely -- discovered the
+# hard way: a stray ANTHROPIC_BASE_URL + ANTHROPIC_DEFAULT_*_MODEL +
+# OPENROUTER_API_KEY combination pointed a real run at a nonexistent
+# OpenRouter model, which failed every invocation with a 404 and tripped
+# the circuit breaker without ever touching the actual product.
 check_auth_mode() {
-  if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+  local suspicious=false
+  if [[ -n "${ANTHROPIC_BASE_URL:-}" && "${ANTHROPIC_BASE_URL}" != "https://api.anthropic.com" ]]; then
+    log "WARNING: ANTHROPIC_BASE_URL is set to '${ANTHROPIC_BASE_URL}', not the default Anthropic endpoint. claude -p will route through whatever this points at."
+    suspicious=true
+  fi
+  for var in ANTHROPIC_DEFAULT_SONNET_MODEL ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL; do
+    if [[ -n "${!var:-}" ]]; then
+      log "WARNING: $var is set to '${!var}' -- overriding the default model for this run."
+      suspicious=true
+    fi
+  done
+  if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+    log "WARNING: OPENROUTER_API_KEY is set. If ANTHROPIC_BASE_URL is also pointed at OpenRouter, this run is not using Anthropic directly."
+    suspicious=true
+  fi
+  if [[ "$suspicious" == "true" ]]; then
+    log "Auth mode: one or more provider-routing overrides detected above -- verify this is intentional before trusting this run. A broken override here fails every invocation identically, which reads as a product bug until you check env vars."
+  elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
     log "Auth mode: ANTHROPIC_API_KEY is set -- this run bills per-token. Consider setting RUN_LEDGER_MAX_COST_USD for real (see loop-budget.md)."
   else
-    log "Auth mode: no ANTHROPIC_API_KEY detected -- assuming subscription login. Usage counts against rate-limit windows, not per-token billing. Dollar figures in the dashboard are informational estimates only."
+    log "Auth mode: no ANTHROPIC_API_KEY or provider-routing override detected -- assuming subscription login. Usage counts against rate-limit windows, not per-token billing. Dollar figures in the dashboard are informational estimates only."
   fi
 }
 
