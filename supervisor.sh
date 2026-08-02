@@ -12,6 +12,10 @@
 #   - audit-tally.json reports production_ready: true, or
 #   - every cluster is parked awaiting the attention queue (nothing left to
 #     do without you), or
+#   - state has stopped changing for STALL_LIMIT consecutive invocations --
+#     covers the case nothing_unblocked_left() can't see: everything got
+#     blocked BEFORE any clustering happened, so cluster-status.json never
+#     existed and that check never fires (see stall detection below), or
 #   - the cumulative circuit breaker in run-ledger.json trips (Component 4.3)
 #
 # Automatically waits out Claude's usage-limit window and resumes without
@@ -49,6 +53,7 @@ MAX_BUDGET_USD="${SUPERVISOR_MAX_BUDGET_USD:-}"          # unset by default -- s
 MAX_ITERATIONS="${SUPERVISOR_MAX_ITERATIONS:-100}"       # cumulative breaker condition (c)
 MAX_CONSECUTIVE_FAILURES="${SUPERVISOR_MAX_CONSECUTIVE_FAILURES:-5}"
 MAX_SAME_ERROR_STREAK="${SUPERVISOR_MAX_SAME_ERROR_STREAK:-5}"
+STALL_LIMIT="${SUPERVISOR_STALL_LIMIT:-2}"               # consecutive no-change invocations before stopping
 
 # Only matters for a genuinely fresh kickoff (no audit-tally.json yet).
 # Once state exists, the loop is fully state-driven and this is ignored.
@@ -63,11 +68,36 @@ log() {
 }
 
 # --- auth-mode pre-flight check (informational, not enforced) --------------
+# Checks for the two ways this run can end up NOT talking to real Claude:
+# an explicit ANTHROPIC_API_KEY (real per-token billing), or a third-party
+# base-URL/model override (e.g. an OpenRouter proxy config) that silently
+# routes claude -p at a different provider/model entirely -- discovered the
+# hard way: a stray ANTHROPIC_BASE_URL + ANTHROPIC_DEFAULT_*_MODEL +
+# OPENROUTER_API_KEY combination pointed a real run at a nonexistent
+# OpenRouter model, which failed every invocation with a 404 and tripped
+# the circuit breaker without ever touching the actual product.
 check_auth_mode() {
-  if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+  local suspicious=false
+  if [[ -n "${ANTHROPIC_BASE_URL:-}" && "${ANTHROPIC_BASE_URL}" != "https://api.anthropic.com" ]]; then
+    log "WARNING: ANTHROPIC_BASE_URL is set to '${ANTHROPIC_BASE_URL}', not the default Anthropic endpoint. claude -p will route through whatever this points at."
+    suspicious=true
+  fi
+  for var in ANTHROPIC_DEFAULT_SONNET_MODEL ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL; do
+    if [[ -n "${!var:-}" ]]; then
+      log "WARNING: $var is set to '${!var}' -- overriding the default model for this run."
+      suspicious=true
+    fi
+  done
+  if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+    log "WARNING: OPENROUTER_API_KEY is set. If ANTHROPIC_BASE_URL is also pointed at OpenRouter, this run is not using Anthropic directly."
+    suspicious=true
+  fi
+  if [[ "$suspicious" == "true" ]]; then
+    log "Auth mode: one or more provider-routing overrides detected above -- verify this is intentional before trusting this run. A broken override here fails every invocation identically, which reads as a product bug until you check env vars."
+  elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
     log "Auth mode: ANTHROPIC_API_KEY is set -- this run bills per-token. Consider setting RUN_LEDGER_MAX_COST_USD for real (see loop-budget.md)."
   else
-    log "Auth mode: no ANTHROPIC_API_KEY detected -- assuming subscription login. Usage counts against rate-limit windows, not per-token billing. Dollar figures in the dashboard are informational estimates only."
+    log "Auth mode: no ANTHROPIC_API_KEY or provider-routing override detected -- assuming subscription login. Usage counts against rate-limit windows, not per-token billing. Dollar figures in the dashboard are informational estimates only."
   fi
 }
 
@@ -146,6 +176,17 @@ production_ready() {
     [[ "$(python -c "import json; print(json.load(open('$AUDIT_TALLY')).get('production_ready', False))" 2>/dev/null)" == "True" ]]
 }
 
+# Fingerprint of everything a session could have changed. Two consecutive
+# invocations producing an identical hash means nothing happened -- the
+# session looked, found nothing new to cluster/build/park, and exited.
+# That's the stall signal nothing_unblocked_left() misses when
+# cluster-status.json never got created in the first place (e.g. every
+# finding from an audit was blocked pre-clustering, so there was never
+# anything to cluster).
+state_hash() {
+  cat "$AUDIT_TALLY" "$CLUSTER_STATUS" "$ATTENTION_QUEUE" 2>/dev/null | md5sum | cut -d' ' -f1
+}
+
 # Everything either "complete" or "parked_*" -- nothing "in_progress" or
 # unstarted left for a fresh invocation to pick up.
 nothing_unblocked_left() {
@@ -222,6 +263,9 @@ there."
     FIRST_INSTRUCTION=""
   fi
 
+  STALL_COUNT=0
+  PREV_STATE_HASH="$(state_hash)"
+
   while true; do
     if production_ready; then
       log "production_ready: true — stopping. Two consecutive clean audits reached."
@@ -290,6 +334,19 @@ than stopping." \
       trip_and_stop "${TRIP_RESULT#TRIPPED:}"
       break
     fi
+
+    NEW_STATE_HASH="$(state_hash)"
+    if [[ "$NEW_STATE_HASH" == "$PREV_STATE_HASH" ]]; then
+      STALL_COUNT=$((STALL_COUNT + 1))
+      log "No change in audit-tally/cluster-status/attention-queue this cycle (stall $STALL_COUNT/$STALL_LIMIT)."
+      if [[ "$STALL_COUNT" -ge "$STALL_LIMIT" ]]; then
+        log "State unchanged for $STALL_LIMIT consecutive invocations — nothing left to do without you. Stopping. Check $ATTENTION_QUEUE for anything pending your decision."
+        break
+      fi
+    else
+      STALL_COUNT=0
+    fi
+    PREV_STATE_HASH="$NEW_STATE_HASH"
 
     log "Session cycle complete. Looping immediately to pick up more work."
   done
