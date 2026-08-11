@@ -200,4 +200,15 @@ Always run `{{LINT_COMMAND}}` before committing. Consult your linting configurat
 - CODEOWNERS reviewers required
 - No direct pushes to `{{MAIN_BRANCH}}`
 
+### Manual Merge Override
+
+Merge authority stays with the human repo owner — that never collapses. In practice it reaches GitHub two ways:
+
+1. **The default path**: the repo owner clicks merge in the GitHub UI (or a project-specific mechanical gate does it on their behalf per pre-agreed criteria — e.g. ticket + reviewer-approval evidence). This is what step 7 above assumes.
+2. **The override path**: the repo owner gives Claude a direct, explicit instruction in a live chat session to merge a specific PR right now. This is still the human deciding — it just wasn't expressed by a click, so it needs its own audit trail to stay reconstructable from repo history alone.
+
+That trail is `/hitl-merge <PR-number>` (`.claude/scripts/hitl-merge.sh`): it merges the PR and posts a comment recording that this was a manual override, not a gate pass. Only invoke it when the repo owner has *just*, in that session, said to merge that specific PR — never because a PR looks trivial, is docs-only, or has been open a while. If a PR should merge automatically and isn't, that's a gap in this project's mechanical gate to fix, not a reason to reach for this command on your own initiative.
+
+If a project layers additional checks on top (ticket evidence, file-based sensitivity denylists, etc.), decide per-project whether the override applies uniformly or carves out exceptions — document that choice explicitly in this file rather than leaving it implicit.
+
 **Detailed Guides**: [docs/ci-cd/CI-CD-Pipeline-Guide.md](docs/ci-cd/CI-CD-Pipeline-Guide.md) | [docs/workflow/](docs/workflow/)
