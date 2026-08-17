@@ -29,7 +29,13 @@ Usage:
       --files src/calc/depreciation.py --classification REGRESSION \
       --feature "MACRS mid-quarter convention" \
       --issue-type "missing edge-case handling: partial-year disposition" \
-      --tier 1 --tokens 84852 --turns 22
+      --tier 1
+
+  # Once the fixing session's transcript is complete (e.g. at session end),
+  # record its REAL cost -- reads actual per-turn token usage off the
+  # transcript instead of a hand-typed --tokens/--turns guess:
+  python recurrence_detect.py record-cost --ticket-id ABC-104
+  python recurrence_detect.py record-cost --ticket-id ABC-104 --transcript /path/to/session.jsonl
 
   python recurrence_detect.py log-feature --feature "MACRS mid-quarter convention" \
       --classification MATCH
@@ -38,6 +44,7 @@ Usage:
 """
 import argparse
 import json
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -110,6 +117,118 @@ def cmd_log_fix(args):
     print(f"Logged fix for {args.ticket_id} (cycle {cycle}).")
 
 
+# --- transcript-derived cost -----------------------------------------------
+#
+# log-fix's --tokens/--turns args have existed since this file was written,
+# but nothing ever called it with real numbers -- every fix-history.json
+# entry sat at tokens_used=0/turns_used=0 because "figure out how many
+# tokens this fix cost" had no actual mechanism behind it, just an argparse
+# flag waiting for a human to type a number nobody was computing. A Claude
+# Code session's own transcript (.jsonl under ~/.claude/projects/<escaped
+# cwd>/) already records real per-turn `usage` (input/output/cache tokens)
+# on every assistant message -- that's a genuine, non-fabricated signal,
+# not an estimate. record-cost reads it and patches it onto an existing
+# fix-history.json entry after the fact, so log-fix (called at fix time,
+# when the transcript isn't finished yet) and record-cost (called once it
+# is, e.g. at session end) stay two separate steps.
+
+
+def _escape_project_path(path_str):
+    """Mirrors Claude Code's own project-folder naming: every character
+    that isn't alphanumeric becomes a literal '-', no collapsing of
+    consecutive separators."""
+    return "".join(c if c.isalnum() else "-" for c in path_str)
+
+
+def _main_repo_root():
+    """Resolves to the MAIN worktree's root, not whichever worktree cwd
+    happens to be in -- `git rev-parse --git-common-dir` returns the shared
+    .git dir regardless of which worktree you're standing in, so its parent
+    is stable across every worktree of this repo. Returns None outside a
+    git repo / if git isn't on PATH."""
+    try:
+        out = subprocess.run(["git", "rev-parse", "--git-common-dir"],
+                              capture_output=True, text=True, timeout=5, check=True).stdout.strip()
+    except Exception:
+        return None
+    common_dir = Path(out)
+    if not common_dir.is_absolute():
+        common_dir = Path.cwd() / common_dir
+    return common_dir.resolve().parent
+
+
+def _default_transcript():
+    """Best-effort: the most recently modified .jsonl across every
+    transcript folder plausibly holding this session's history.
+
+    Looking ONLY at escaped(cwd)'s own project folder is correct in the
+    common non-worktree case, but wrong for ticket work done in a
+    worktree: a session that `cd`s into (or is started at) a worktree
+    directory doesn't necessarily get its OWN transcript folder keyed to
+    that worktree path. What DOES reliably exist is the main repo's own
+    project folder, plus nested per-worktree folders keyed off the main
+    repo's escaped path. So: search escaped(cwd)'s own folder (still
+    checked first -- correct and cheapest when it exists), escaped(main
+    repo root)'s own folder, and every folder whose name starts with
+    escaped(main repo root) (catches the nested-worktree convention) --
+    then take the single most recently modified .jsonl across all of them.
+    Still best-effort, not a guarantee (a completely unrelated concurrent
+    session in the same project folder could win) -- always prints which
+    file it picked so a caller can sanity-check, and --transcript
+    overrides this entirely."""
+    projects_dir = Path.home() / ".claude" / "projects"
+    search_dirs = set()
+
+    cwd_folder = projects_dir / _escape_project_path(str(Path.cwd().resolve()))
+    if cwd_folder.exists():
+        search_dirs.add(cwd_folder)
+
+    main_root = _main_repo_root()
+    if main_root:
+        main_escaped = _escape_project_path(str(main_root))
+        main_folder = projects_dir / main_escaped
+        if main_folder.exists():
+            search_dirs.add(main_folder)
+        if projects_dir.exists():
+            for child in projects_dir.iterdir():
+                if child.is_dir() and child.name.startswith(main_escaped):
+                    search_dirs.add(child)
+
+    candidates = [p for d in search_dirs for p in d.glob("*.jsonl")]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def _compute_transcript_usage(transcript_path):
+    """Sums real usage off every assistant-role message's `usage` field
+    (input + output + cache_creation + cache_read tokens) and counts
+    assistant turns. Malformed/non-JSON lines are skipped rather than
+    failing the whole read -- transcripts can contain non-message event
+    types (queue-operation, attachment, mode, etc.), not every line is a
+    message."""
+    tokens = 0
+    turns = 0
+    with open(transcript_path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                d = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            msg = d.get("message")
+            if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                continue
+            turns += 1
+            usage = msg.get("usage") or {}
+            tokens += (usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+                       + usage.get("cache_creation_input_tokens", 0)
+                       + usage.get("cache_read_input_tokens", 0))
+    return tokens, turns
+
+
 # --- log-feature ---------------------------------------------------------
 def cmd_log_feature(args):
     history = _load(FEATURE_HISTORY, {"features": {}})
@@ -122,6 +241,41 @@ def cmd_log_feature(args):
     })
     _save(FEATURE_HISTORY, history)
     print(f"Logged {args.feature} classification={args.classification} (cycle {cycle}).")
+
+
+# --- record-cost -----------------------------------------------------------
+def cmd_record_cost(args):
+    if args.transcript:
+        transcript = Path(args.transcript)
+        if not transcript.exists():
+            print(f"Transcript not found: {transcript}", file=sys.stderr)
+            return 1
+    else:
+        transcript = _default_transcript()
+        if not transcript:
+            print("Couldn't auto-detect a transcript for this project -- pass --transcript explicitly.", file=sys.stderr)
+            return 1
+        print(f"Auto-detected transcript: {transcript}")
+
+    tokens, turns = _compute_transcript_usage(transcript)
+    if tokens == 0 and turns == 0:
+        print(f"WARNING: {transcript} yielded 0 tokens/0 turns -- likely the wrong file "
+              f"(no assistant messages with a usage field found). Not writing anything.", file=sys.stderr)
+        return 1
+
+    history = _load(FIX_HISTORY, {"fixes": []})
+    matches = [f for f in history["fixes"] if f["ticket_id"] == args.ticket_id]
+    if not matches:
+        print(f"No fix-history.json entry for {args.ticket_id} -- log the fix first via 'log-fix', "
+              f"then record-cost.", file=sys.stderr)
+        return 1
+    entry = matches[-1]  # most recent, in case the same ticket was fixed more than once
+    entry["tokens_used"] = tokens
+    entry["turns_used"] = turns
+    entry["cost_source"] = f"transcript:{transcript.name}"
+    _save(FIX_HISTORY, history)
+    print(f"Recorded {args.ticket_id}: {tokens:,} tokens, {turns} assistant turns (from {transcript.name}).")
+    return 0
 
 
 # --- detect ---------------------------------------------------------------
@@ -283,6 +437,13 @@ def main():
     p_feat.add_argument("--classification", required=True)
     p_feat.add_argument("--audit-cycle", type=int, default=None)
     p_feat.set_defaults(func=cmd_log_feature)
+
+    p_cost = sub.add_parser("record-cost")
+    p_cost.add_argument("--ticket-id", required=True)
+    p_cost.add_argument("--transcript", default=None,
+                         help="Path to a Claude Code session .jsonl. Omit to auto-detect the most "
+                              "recently modified transcript in this project's own transcript folder.")
+    p_cost.set_defaults(func=cmd_record_cost)
 
     p_detect = sub.add_parser("detect")
     p_detect.set_defaults(func=cmd_detect)
