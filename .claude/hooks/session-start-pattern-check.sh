@@ -26,9 +26,32 @@ fi
 
 echo ""
 echo "🤖 Agent System Ready"
-echo "   11 agents available in .claude/agents/"
-echo "   Tool restrictions: ✅ Configured"
-echo "   Model selection: ✅ Opus (planning), Sonnet (execution)"
+
+# Report what is actually on disk rather than asserting a taxonomy.
+# This banner previously printed "Model selection: ✅ Opus (planning), Sonnet
+# (execution)" as a verified fact. It was false — every agent declares opus —
+# and nothing here ever checked it. A green check for an unperformed check is
+# worse than no line at all, so these are counted, not claimed.
+AGENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../agents" 2>/dev/null && pwd)"
+if [ -n "$AGENT_DIR" ] && [ -d "$AGENT_DIR" ]; then
+  AGENT_COUNT=$(find "$AGENT_DIR" -maxdepth 1 -name '*.md' ! -name 'README.md' -type f | wc -l | tr -d ' ')
+  # CR stripped per-line so CRLF checkouts still report real values instead of silently
+  # showing none; quotes and trailing space tolerated as valid YAML.
+  MODELS=$(awk '
+      FNR==1 { n=0 }
+      { sub(/\r$/, "") }
+      /^---$/ { n++; next }
+      n==1 && /^model:/ {
+          sub(/^model:[[:space:]]*/, "")
+          sub(/[[:space:]]+$/, "")
+          gsub(/^["'"'"']|["'"'"']$/, "")
+          print
+      }' "$AGENT_DIR"/*.md 2>/dev/null | sort -u | paste -sd, - )
+  echo "   ${AGENT_COUNT} agents available in .claude/agents/"
+  echo "   Models in use: ${MODELS:-inherit (none declared)}"
+else
+  echo "   Agent directory not found"
+fi
 echo ""
 
 exit 0
