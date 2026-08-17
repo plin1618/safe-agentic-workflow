@@ -43,6 +43,15 @@ moment a new pending item lands or the loop stops for any reason
 explicitly — "watch the loop and tell me in chat when something needs
 me" — it isn't automatic just because `supervisor.sh` is running.
 
+**Exception:** the tier-approval gate specifically (a batch ready to
+build but waiting on your explicit sign-off before `worktree_manager.sh
+create`) no longer depends on this poll-and-report workaround — it
+self-announces via a Linear comment on every ticket in the batch the
+moment it stalls, per `.claude/loop-constraints.md`'s "Tier-approval
+gate" section. Every other stall reason (a genuine blocker, a design
+decision, circuit-breaker trip) still relies on the poll-and-report ask
+above.
+
 ## Stop conditions
 - `production_ready: true` (2 consecutive clean build-fidelity-audit runs)
 - The cumulative circuit breaker trips (`.claude/state/run-ledger.json`)

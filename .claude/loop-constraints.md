@@ -72,6 +72,55 @@ visible afterward (`status: auto_resolved` in `attention-queue.json`,
 included in `docs/BUILD-STATUS.md`) — the only thing that changes is it
 doesn't block the loop while waiting for a human to look at it.
 
+## Tier-approval gate
+Before running `worktree_manager.sh create <cluster-key>` for a new tier
+batch, the repo owner's explicit sign-off is required on each ticket in
+that batch (e.g. a Linear comment along the lines of "tier approval
+confirmed ... cleared for worktree_manager.sh create") — this is never
+optional. This section closes a **visibility** gap, not the gate itself:
+without it, a stall here relies entirely on LOOP.md's "ask your
+interactive session to poll" workaround, which only works if someone
+remembers to ask — a pattern that has caused real, unnoticed stalls on
+projects running this harness.
+
+**Stall must self-announce.** The moment a session determines a batch is
+ready to build but is blocked on tier-approval (i.e. it would otherwise
+write a `blocker_category: "tier-approval-gate"` entry to
+`attention-queue.json`), it must **also** post a Linear comment on every
+ticket in that batch, in the same call, asking for tier approval —
+don't just write to the attention queue and wait for someone to check
+the dashboard. Use the Linear connector's comment tool (`save_comment` /
+equivalent) with a message identifying the cluster, the tickets, and
+literally what unblocks it (e.g. "Ready to build as tier2-cluster-1 —
+ABC-131, ABC-133. Reply with tier approval to proceed, or flag
+concerns."). This is in addition to, not instead of, the
+`attention-queue.json` entry — the queue stays the system of record; the
+comment is what makes the stall visible without anyone having to go
+looking.
+
+**Pre-authorized low-risk tier for this gate specifically.** A batch may
+skip the ask and proceed straight to `worktree_manager.sh create` without
+waiting for a Linear reply — logged via `attention_queue.py add --risk
+low --decision "..."` exactly like any other low-risk item — only when
+**every** one of these holds:
+- Every ticket in the batch is itself already tagged low-risk under the
+  general "Risk tiers" section above (small/mechanical, zero product/
+  calc/tax-math/spec impact, fully reversible, not a denylisted path).
+- No ticket in the batch touches a file any other in-flight worktree is
+  also touching (no shared-file collision risk from parallelizing).
+- The batch is not, and does not contain, a blocker or a recurring-
+  pattern (Type A-E) finding — **this carve-out does not touch the
+  general Risk tiers section's own exclusion of blockers and recurring
+  patterns from `--risk low`; both exclusions independently apply.**
+
+This is a narrower, separate exception from the general "Risk tiers"
+section above — it exists only to let a tier-approval *stall specifically*
+self-clear for genuinely mechanical batches; it does not change what
+counts as low-risk for any other `attention_queue.py add` call, and the
+general section's own blocker/recurring-pattern exclusion stays intact
+exactly as written. When in doubt whether a batch clears this bar, it
+doesn't — post the Linear comment and park, same as before.
+
 ## Budget discipline
 - Budget enforcement in this build is **turns/iterations-based, not
   dollar-based** — `run-ledger.json`'s circuit breaker trips on
