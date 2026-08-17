@@ -18,12 +18,39 @@ discipline" section.
 The following always require human approval — never auto-proceed, no
 exceptions:
 - Any change touching a path in `.github/gate.yaml`'s denylist
-- Any blocker or design decision (routed to `.claude/state/attention-queue.json`)
+- Any blocker (routed to `.claude/state/attention-queue.json`)
+- Any design decision, **unless** it clears every bullet in
+  `.claude/loop-constraints.md`'s "Risk tiers" section — those narrow,
+  no-product-impact cases may be decided and logged in the same call
+  (`attention_queue.py add --risk low --decision "..."`) instead of
+  parking. Still fully visible afterward, just not blocking. When in
+  doubt it's high-risk and parks like before.
 - Final production-ready sign-off — reaching `production_ready: true` in
   `.claude/state/audit-tally.json` means the loop stops asking for fixes,
   not that the human's final review is skipped
 - Any unresolved recurring pattern (Component 6, Types A-E) — these are
   surfaced as hypotheses for human judgment, never auto-resolved
+
+## Getting notified
+`supervisor.sh` itself only logs to `.claude/state/supervisor.log` and the
+state JSON files — it does not push anywhere. Don't rely on remembering
+to check it. Instead, ask your interactive Claude Code session (the one
+you're talking to, not the headless loop) to poll and report: it can
+schedule its own periodic wakeups, diff `attention-queue.json` and
+`supervisor.log` against what it last saw, and message you in chat the
+moment a new pending item lands or the loop stops for any reason
+(production-ready, parked, or circuit-breaker tripped). Ask for this
+explicitly — "watch the loop and tell me in chat when something needs
+me" — it isn't automatic just because `supervisor.sh` is running.
+
+**Exception:** the tier-approval gate specifically (a batch ready to
+build but waiting on your explicit sign-off before `worktree_manager.sh
+create`) no longer depends on this poll-and-report workaround — it
+self-announces via a Linear comment on every ticket in the batch the
+moment it stalls, per `.claude/loop-constraints.md`'s "Tier-approval
+gate" section. Every other stall reason (a genuine blocker, a design
+decision, circuit-breaker trip) still relies on the poll-and-report ask
+above.
 
 ## Stop conditions
 - `production_ready: true` (2 consecutive clean build-fidelity-audit runs)

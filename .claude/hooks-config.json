@@ -69,6 +69,28 @@
             "description": "Format and lint markdown files after edit"
           }
         ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/loop-engineering/build_dashboard.py render-html",
+            "if": "Edit(.claude/state/**)",
+            "description": "Refresh build-dashboard.html DYNAMIC regions after state writes"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/loop-engineering/build_dashboard.py render-html",
+            "if": "Write(.claude/state/**)",
+            "description": "Refresh build-dashboard.html DYNAMIC regions after state writes"
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -91,6 +113,18 @@
             "type": "command",
             "command": "git status --porcelain | grep -q . && echo '⚠️ Session ending with uncommitted changes. Use /end-work to complete cleanly.' || echo '✅ Clean session end - no uncommitted changes'",
             "description": "Check for uncommitted work at session end"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/loop-engineering/session_end_record_cost.sh",
+            "description": "Record real per-ticket token/turn cost from the session transcript (fails soft if not on a ticket branch)"
           }
         ]
       }

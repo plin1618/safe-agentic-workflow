@@ -284,17 +284,26 @@ there."
 
     OUTPUT=$(claude -p "Before anything else, read .claude/loop-constraints.md
 in full -- it has hard constraints on scope, path restrictions, process,
-and escalation that apply to this entire session. ${FIRST_INSTRUCTION:+$FIRST_INSTRUCTION
+and escalation that apply to this entire session, including the Risk
+tiers section: most blockers/design decisions still park and wait for a
+human, but a narrow low-risk class (no product/calc/spec impact, fully
+reversible, not a denylisted path, not a recurring pattern) may be
+decided and logged in the same attention_queue.py call via '--risk low
+--decision \"...\"' instead of parking -- read that section's bullets
+before ever using it, and default to parking when unsure. ${FIRST_INSTRUCTION:+$FIRST_INSTRUCTION
 
 }Resume the continuous build loop. Check $STATE_DIR/ for
 current progress (audit-tally.json, cluster-status.json). Do whatever
 unblocked work exists: implement tickets in their assigned worktrees, run
 build-fidelity-audit when a tier's clusters are done, dispatch the next
-tier's clustering if the current one is fully complete. If a cluster hits
-a blocker or needs a design decision, write an entry to
-$ATTENTION_QUEUE describing exactly what's needed, mark that cluster
-parked in cluster-status.json, and move on to other unblocked work rather
-than stopping." \
+tier's clustering if the current one is fully complete. When you run
+build-fidelity-audit, log() how much of the checklist this pass actually
+covered (its Coverage table: audited / not yet audited / deferred counts)
+-- don't just log that it ran. If a cluster hits a blocker or needs a
+design decision, write an entry to $ATTENTION_QUEUE describing exactly
+what's needed, mark that cluster parked in cluster-status.json, and move
+on to other unblocked work rather than stopping -- unless it clears the
+Risk tiers bar, in which case resolve it in the same call instead." \
       --dangerously-skip-permissions \
       --max-turns "$MAX_TURNS" \
       "${BUDGET_ARGS[@]}" \
