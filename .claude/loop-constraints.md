@@ -31,6 +31,46 @@ invocation.
 - When uncertain whether something needs human input, escalate (write to
   `attention-queue.json`) rather than guess. A false escalation costs a
   few minutes of human review; false confidence costs correctness.
+- **Default to `--risk high`** (the flag's default) on every
+  `attention_queue.py add` call. Only pass `--risk low` when the item
+  clears every bullet in "Risk tiers" below. When genuinely unsure which
+  tier applies, that uncertainty itself means high — escalate.
+
+## Risk tiers
+Not every `attention_queue.py add` needs to park and wait. A **low-risk**
+item can be decided and logged in the same call (`--risk low --decision
+"..."`) instead of blocking a human. This is a narrow carve-out, not a
+default — most design decisions and all blockers stay high-risk.
+
+**Low-risk (may auto-resolve with `--risk low`) — ALL of these must hold:**
+- Zero product, calculation, tax-math, or spec impact — purely
+  supervisor/tooling/process mechanics (e.g. a logging duplication in
+  `supervisor.sh`, a script's internal retry count, a lint config choice).
+- Fully reversible by a normal follow-up commit — nothing that ships to
+  users or touches data.
+- Does not touch any path in `.github/gate.yaml`'s denylist.
+- Not a recurring-pattern (Type A-E) finding — those are always surfaced
+  for human judgment per LOOP.md, never auto-resolved.
+- You can state the decision and reasoning in one or two sentences — if
+  it takes a design discussion to justify, it isn't low-risk.
+
+**Always high-risk (never use `--risk low`), regardless of how small the
+diff looks:**
+- Anything a project's own CLAUDE.md flags for explicit escalation (e.g.
+  calculation/tax-math behavior changes, UI/IA shape changes, spec
+  deviations — see this repo's CLAUDE.md for its specific list).
+- Any edit to a Blueprint, DDD, or other spec document Claude Code isn't
+  authorized to edit directly.
+- Anything touching `.github/gate.yaml`'s denylist.
+- All blockers (by definition: work cannot continue without a decision —
+  see the `--type blocker` guard in `attention_queue.py`, which rejects
+  `--risk low` outright).
+- All recurring-pattern findings (Type A-E).
+
+When in doubt, treat it as high-risk. A low-risk item is still fully
+visible afterward (`status: auto_resolved` in `attention-queue.json`,
+included in `docs/BUILD-STATUS.md`) — the only thing that changes is it
+doesn't block the loop while waiting for a human to look at it.
 
 ## Budget discipline
 - Budget enforcement in this build is **turns/iterations-based, not
