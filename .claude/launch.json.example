@@ -1,0 +1,22 @@
+{
+  "_comment": "Dev-server declarations for Claude Code's preview/run tooling (the 'run' skill, preview_start). Copy to .claude/launch.json and edit for this project's actual stack -- ports, commands, and cwd below are examples, not defaults. Not templated with {{...}} placeholders like other harness files, since the shape (single app vs. separate frontend/backend, monorepo layout) varies too much per project to substitute mechanically.",
+
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "app",
+      "port": 3000
+    },
+    {
+      "_comment": "Example second entry for a split frontend/backend layout. Delete if this project is a single app.",
+      "name": "api",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--port", "8000"],
+      "cwd": "api",
+      "port": 8000
+    }
+  ]
+}
