@@ -27,6 +27,39 @@ invocation.
   independent QAS evidence (e.g. a Linear comment posted by the QAS
   subagent), treat the ticket as not ready to merge.
 
+## Working-directory isolation
+- A branch name is a label, not isolation. Checking out a different branch
+  in the same working directory does **not** protect concurrent work — if
+  any other process (a supervisor loop, another interactive session, a
+  scheduled task) might touch this repo's primary checkout at the same time
+  you are, your edits and its `git checkout` / `git reset` / `git
+  cherry-pick` operations land in the exact same files on disk, because a
+  single checkout has exactly one working directory regardless of how many
+  branch names get used in it. This has caused real, disruptive conflicts on
+  projects running this harness — uncommitted work mid-edit colliding with a
+  concurrent supervisor squash-merge, branches moving out from under a
+  session, working-tree state left inconsistent mid-task.
+- **Before editing any file**, if there's any chance another process is or
+  might be working this same checkout — including a supervisor loop you
+  can't directly observe — create your own worktree instead of just
+  branching:
+  ```bash
+  git worktree add ../<repo>-<ticket-or-task-slug> -b <branch-name>
+  cd ../<repo>-<ticket-or-task-slug>
+  ```
+  This gives you a separate directory with its own checked-out files,
+  sharing only the `.git` object store — a concurrent process checking out
+  a different branch in the *original* directory can no longer touch your
+  files at all.
+- This applies beyond the tiered `worktree_manager.sh create` flow (below,
+  under "Tier-approval gate"), which already does this for supervisor batch
+  clusters — it applies to **any** session: interactive, ad-hoc, or a
+  one-off chat-directed task with no ticket/cluster of its own. If you
+  aren't certain you're the only thing touching the repo's primary
+  checkout, isolate first; don't find out the hard way.
+- Clean up the worktree (`git worktree remove <path>`) once the branch is
+  merged or abandoned — don't leave stale worktrees accumulating.
+
 ## Escalation discipline
 - When uncertain whether something needs human input, escalate (write to
   `attention-queue.json`) rather than guess. A false escalation costs a
