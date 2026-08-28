@@ -68,6 +68,33 @@ invocation.
   `attention_queue.py add` call. Only pass `--risk low` when the item
   clears every bullet in "Risk tiers" below. When genuinely unsure which
   tier applies, that uncertainty itself means high — escalate.
+- **Check for a prior closure before writing a new entry — every time, not
+  just when something feels familiar.** This applies to backlog sweeps
+  specifically, but also to any moment you're about to write a
+  `design_decision` (or other) entry for a ticket: "when uncertain,
+  escalate" is about *whether human input is needed*, not a license to
+  skip checking whether that input was already given. A ticket sitting in
+  Backlog/Todo status is not proof the underlying question is still open —
+  Linear status commonly desyncs from doc-only resolutions (a DDD Change
+  Log entry, an attention-queue resolution) because the GitHub↔Linear
+  integration only auto-advances status off branch/PR merge activity.
+  Before calling `attention_queue.py add` for a ticket:
+  1. Run `attention_queue.py list` and grep the output for the ticket ID.
+     If a `resolved`/`auto_resolved` item already covers it, don't add a
+     new one — `add`'s own dedup check will refuse a `--ticket-ids` match
+     against a resolved item anyway (see attention_queue.py's docstring),
+     but check first rather than relying on the refusal as your process.
+  2. Check the project's canonical DDD's Change Log (find the current DDD
+     via `docs/INDEX.md`) for a decision covering the same feature/gap
+     under a *different* DDD or decision number — a ticket can be decided
+     in a DDD session without ever touching attention-queue.json.
+  3. Only write a new entry if neither check turns up a matching closure.
+  If you determine a ticket is a duplicate/already-decided this way,
+  **flip its Linear status** (Done/Cancelled, with a comment pointing at
+  the DDD/decision that resolved it) in the same pass — logging the
+  duplicate to attention-queue.json without also closing the Linear
+  ticket leaves the actual re-surfacing mechanism (stale Backlog status)
+  in place for the next sweep to trip over again.
 
 ## Risk tiers
 Not every `attention_queue.py add` needs to park and wait. A **low-risk**

@@ -303,7 +303,16 @@ covered (its Coverage table: audited / not yet audited / deferred counts)
 design decision, write an entry to $ATTENTION_QUEUE describing exactly
 what's needed, mark that cluster parked in cluster-status.json, and move
 on to other unblocked work rather than stopping -- unless it clears the
-Risk tiers bar, in which case resolve it in the same call instead." \
+Risk tiers bar, in which case resolve it in the same call instead. Before
+writing any new design_decision entry for a ticket, follow
+loop-constraints.md's escalation-discipline dedup steps (check
+attention_queue.py list for the ticket ID, and the canonical DDD's Change
+Log via docs/INDEX.md) -- a ticket sitting in Backlog/Todo status is not
+proof it's still open, Linear status commonly desyncs from doc-only
+resolutions. If you determine a ticket is a duplicate/already-decided,
+flip its Linear status (Done/Cancelled) with a comment pointing at the
+resolving DDD/decision in the same pass -- logging the duplicate without
+closing the Linear ticket leaves it to be re-flagged by the next sweep." \
       --dangerously-skip-permissions \
       --max-turns "$MAX_TURNS" \
       "${BUDGET_ARGS[@]}" \
