@@ -265,6 +265,8 @@ there."
 
   STALL_COUNT=0
   PREV_STATE_HASH="$(state_hash)"
+  CYCLE_NUM=0
+  mkdir -p "$STATE_DIR/cycles"
 
   while true; do
     if production_ready; then
@@ -321,6 +323,18 @@ closing the Linear ticket leaves it to be re-flagged by the next sweep." \
     EXIT_CODE=$?
     FIRST_INSTRUCTION=""  # only prepended once, on the genuinely fresh pass
 
+    # Full session output, on every invocation regardless of outcome -- the
+    # failure path below already dumps $OUTPUT into supervisor.log, but a
+    # successful cycle previously logged only "Session cycle complete", with
+    # zero record of what the session actually did. That makes a stalled
+    # cycle undiagnosable: no way to tell "genuinely found nothing to do"
+    # from "hit a silent problem partway through" (e.g. a tool-permission
+    # denial that didn't register as a shell error). One JSON file per
+    # cycle keeps supervisor.log itself from ballooning.
+    CYCLE_NUM=$((CYCLE_NUM + 1))
+    CYCLE_FILE="$STATE_DIR/cycles/$(printf '%04d' "$CYCLE_NUM")-$(date -u +%Y%m%dT%H%M%SZ).json"
+    echo "$OUTPUT" > "$CYCLE_FILE"
+
     if echo "$OUTPUT" | grep -qiE "session limit|usage limit|rate limit"; then
       RESET_TIME=$(parse_reset_time "$OUTPUT")
       if [[ -n "$RESET_TIME" ]]; then
@@ -366,7 +380,7 @@ closing the Linear ticket leaves it to be re-flagged by the next sweep." \
     fi
     PREV_STATE_HASH="$NEW_STATE_HASH"
 
-    log "Session cycle complete. Looping immediately to pick up more work."
+    log "Session cycle complete. Output saved to $CYCLE_FILE. Looping immediately to pick up more work."
   done
 
   log "Supervisor stopped."
