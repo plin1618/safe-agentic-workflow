@@ -47,6 +47,7 @@ CLUSTER_STATUS="$STATE_DIR/cluster-status.json"
 ATTENTION_QUEUE="$STATE_DIR/attention-queue.json"
 RUN_LEDGER="$STATE_DIR/run-ledger.json"
 LOG_FILE="$STATE_DIR/supervisor.log"
+PID_FILE="$STATE_DIR/supervisor.pid"
 
 MAX_TURNS="${SUPERVISOR_MAX_TURNS:-50}"
 MAX_BUDGET_USD="${SUPERVISOR_MAX_BUDGET_USD:-}"          # unset by default -- see caveats above
@@ -200,27 +201,100 @@ raise SystemExit(0 if not active else 1)
 " 2>/dev/null
 }
 
-# Parses a reset time out of Claude Code's own error message format, e.g.
-# "You've hit your session limit · resets 3:45pm". NOT YET TESTED against a
-# real rate-limit hit -- verify this regex against the actual message
-# before trusting it; see the caveats at the top of this file.
+# Parses a reset time out of Claude Code's own error message format.
+# Two shapes seen in practice:
+#   "You've hit your session limit · resets 3:45pm"           (same-day)
+#   "You've hit your weekly limit · resets Aug 23, 3am (...)"  (dated)
+#
+# CONFIRMED BROKEN against a real rate-limit hit on 2026-08-18 (see
+# B1_RE_invest/supervisor-improvements.md, the sibling project this fix was
+# ported from): the old regex captured the literal word "resets" along with
+# the clock time (e.g. "resets 11:40pm"), which `date -d` cannot parse -- it
+# silently failed, leaving target_epoch empty, which bash arithmetic treated
+# as 0, producing a wildly negative diff that was then fed to `sleep`, which
+# rejected the negative number as an invalid option and errored instantly.
+# Net effect: the loop tight-looped invoking `claude -p` against a live rate
+# limit instead of waiting it out. Fixed by capturing only the clock-time
+# portion and by seconds_until() falling back to a fixed wait -- never a
+# negative or garbage sleep -- whenever parsing fails for any reason.
+#
+# Also fixes a second, separately-confirmed bug: a weekly-limit hit
+# ("You've hit your weekly limit · resets Aug 23, 3am") wasn't recognized as
+# a rate limit at all by the caller's OUTPUT grep (only "session limit|usage
+# limit|rate limit" was matched, not "weekly limit") -- see the grep below
+# in main(), also updated to match "weekly limit".
 parse_reset_time() {
   local output="$1"
-  echo "$output" | grep -oiE 'resets?[: ]+[0-9]{1,2}(:[0-9]{2})?\s*(am|pm)?' | head -1
+  # Prefer a full "Mon DD, H(:MM)?(am|pm)" dated reset if present (strip
+  # the comma -- GNU `date -d "Aug 23 3am"` parses, `"Aug 23, 3am"` does
+  # not). Falls back to a bare clock time for the same-day session-limit
+  # message shape.
+  local dated
+  dated=$(echo "$output" | grep -oiE '[A-Z][a-z]{2} [0-9]{1,2},? *[0-9]{1,2}(:[0-9]{2})? *(am|pm)' | head -1 | tr -d ',')
+  if [[ -n "$dated" ]]; then
+    echo "$dated"
+    return
+  fi
+  echo "$output" | grep -oiE '[0-9]{1,2}(:[0-9]{2})?\s*(am|pm)' | head -1
 }
+
+# Fixed fallback wait when the reset time can't be parsed or parses to
+# something nonsensical -- matches the "couldn't parse" branch in main().
+FALLBACK_WAIT_SECONDS=$((5 * 60 * 60))
 
 seconds_until() {
   local target="$1"
   local target_epoch
   target_epoch=$(date -d "$target" +%s 2>/dev/null || date -j -f "%I:%M%p" "$target" +%s 2>/dev/null)
+  # Parsing failed outright (empty result, or non-numeric) -- don't let
+  # bash arithmetic below silently treat that as epoch 0.
+  if [[ -z "$target_epoch" || ! "$target_epoch" =~ ^[0-9]+$ ]]; then
+    echo "$FALLBACK_WAIT_SECONDS"
+    return
+  fi
   local now_epoch
   now_epoch=$(date +%s)
   local diff=$(( target_epoch - now_epoch ))
-  # If the parsed time is earlier today than now, it means tomorrow.
-  if (( diff < 0 )); then
+  # A target with a month name already carries an explicit date (weekly
+  # reset) -- a negative diff there means genuinely stale/bad parsing, not
+  # "must mean tomorrow". Only bare clock times (same-day session limit)
+  # get the +24h "must mean tomorrow" treatment.
+  if [[ ! "$target" =~ [A-Za-z]{3}\ [0-9] ]] && (( diff < 0 )); then
     diff=$(( diff + 86400 ))
   fi
+  # Sanity guard: bare clock-time resets should be within 24h; dated
+  # resets (weekly limit) should be within ~9 days (one week + buffer).
+  # Outside that, something upstream (parsing, clock skew, DST) is wrong
+  # -- fall back rather than handing sleep a value that breaks it again.
+  local max_diff=86400
+  if [[ "$target" =~ [A-Za-z]{3}\ [0-9] ]]; then
+    max_diff=$((9 * 86400))
+  fi
+  if (( diff < 0 || diff > max_diff )); then
+    echo "$FALLBACK_WAIT_SECONDS"
+    return
+  fi
   echo "$diff"
+}
+
+# --- single-instance lock ---------------------------------------------------
+# Without this, launching supervisor.sh twice (two terminals, forgot the
+# first was still running) has both instances read/write run-ledger.json and
+# the cluster/attention-queue state files concurrently with no locking -- a
+# real race condition. Ported from B1_RE_ledger's supervisor.sh.
+acquire_lock() {
+  if [[ -f "$PID_FILE" ]]; then
+    local existing_pid
+    existing_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+      log "Another supervisor instance is already running (PID $existing_pid, lockfile $PID_FILE). Refusing to start a second one."
+      exit 1
+    fi
+    log "Stale lockfile found (PID ${existing_pid:-unknown} not running). Removing and continuing."
+    rm -f "$PID_FILE"
+  fi
+  echo "$$" > "$PID_FILE"
+  trap 'rm -f "$PID_FILE"' EXIT
 }
 
 trip_and_stop() {
@@ -232,6 +306,7 @@ trip_and_stop() {
 
 main() {
   mkdir -p "$STATE_DIR"
+  acquire_lock
   log "Supervisor starting."
   check_auth_mode
   init_run_ledger
@@ -265,6 +340,8 @@ there."
 
   STALL_COUNT=0
   PREV_STATE_HASH="$(state_hash)"
+  CYCLE_NUM=0
+  mkdir -p "$STATE_DIR/cycles"
 
   while true; do
     if production_ready; then
@@ -321,7 +398,19 @@ closing the Linear ticket leaves it to be re-flagged by the next sweep." \
     EXIT_CODE=$?
     FIRST_INSTRUCTION=""  # only prepended once, on the genuinely fresh pass
 
-    if echo "$OUTPUT" | grep -qiE "session limit|usage limit|rate limit"; then
+    # Full session output, on every invocation regardless of outcome -- the
+    # failure path below already dumps $OUTPUT into supervisor.log, but a
+    # successful cycle previously logged only "Session cycle complete", with
+    # zero record of what the session actually did. That makes a stalled
+    # cycle undiagnosable: no way to tell "genuinely found nothing to do"
+    # from "hit a silent problem partway through" (e.g. a tool-permission
+    # denial that didn't register as a shell error). One JSON file per
+    # cycle keeps supervisor.log itself from ballooning.
+    CYCLE_NUM=$((CYCLE_NUM + 1))
+    CYCLE_FILE="$STATE_DIR/cycles/$(printf '%04d' "$CYCLE_NUM")-$(date -u +%Y%m%dT%H%M%SZ).json"
+    echo "$OUTPUT" > "$CYCLE_FILE"
+
+    if echo "$OUTPUT" | grep -qiE "session limit|usage limit|rate limit|weekly limit"; then
       RESET_TIME=$(parse_reset_time "$OUTPUT")
       if [[ -n "$RESET_TIME" ]]; then
         WAIT_SECONDS=$(seconds_until "$RESET_TIME")
@@ -366,7 +455,7 @@ closing the Linear ticket leaves it to be re-flagged by the next sweep." \
     fi
     PREV_STATE_HASH="$NEW_STATE_HASH"
 
-    log "Session cycle complete. Looping immediately to pick up more work."
+    log "Session cycle complete. Output saved to $CYCLE_FILE. Looping immediately to pick up more work."
   done
 
   log "Supervisor stopped."
