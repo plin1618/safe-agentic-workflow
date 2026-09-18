@@ -177,6 +177,29 @@ with the corresponding value before writing to disk.
 - The order of replacement follows the same "longer first" rule as
   `setup-template.sh` to avoid partial matches
 
+**Command-string tokens (a common `substitutions` use case):**
+
+`.claude/commands/pre-pr.md`, `local-sync.md`, `quick-fix.md`, `update-docs.md`,
+and `audit-deps.md` reference tokens like `{{CI_VALIDATE_COMMAND}}`,
+`{{PACKAGE_MANAGER}}`, `{{TYPE_CHECK_COMMAND}}`, `{{LINT_COMMAND}}`,
+`{{TEST_UNIT_COMMAND}}`, `{{LINT_MD_COMMAND}}`, and `{{LINT_MD_FIX_COMMAND}}`.
+These are deliberately *not* part of the standard 22 identity fields, because
+the right command varies too much by stack (npm/yarn/pnpm/poetry, a combined
+`ci:validate` script vs. separate typecheck/lint/test invocations, markdown
+linting that may not exist at all). Set whichever of these your project's
+commands actually use in `substitutions`, e.g.:
+
+```yaml
+substitutions:
+  CI_VALIDATE_COMMAND: "npm run typecheck && npm run lint && npm test"
+  PACKAGE_MANAGER: "npm"
+```
+
+If a project's real command doesn't fit any of these tokens cleanly (see
+`local-sync.md`'s Prisma/Docker/Slack-specific steps), don't force it —
+hand-rewrite that section directly and add the file to `protected` (see
+below) instead of stretching the substitution model to cover it.
+
 ---
 
 ### `renames` (OPTIONAL)

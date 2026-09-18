@@ -26,8 +26,8 @@ mcp__{{MCP_LINEAR_SERVER}}__get_issue {{{TICKET_PREFIX}}-number}
 Check commits since dev:
 
 ```bash
-git log origin/dev..HEAD --oneline
-git diff origin/dev --stat
+git log origin/{{MAIN_BRANCH}}..HEAD --oneline
+git diff origin/{{MAIN_BRANCH}} --stat
 ```
 
 Analyze:

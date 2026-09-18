@@ -3,8 +3,7 @@ description: Check and update relevant documentation for current work
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ---
 
-Review current work and identify documentation that needs updating
-per @CONTRIBUTING.md requirement: "always update docs related to the work we are doing within the PR".
+Review current work and identify documentation that needs updating. If this repo has a CONTRIBUTING.md with a docs-update requirement, follow it; otherwise apply the general rule: always update docs related to the work in this PR.
 
 ## Documentation Assessment
 
@@ -13,7 +12,7 @@ per @CONTRIBUTING.md requirement: "always update docs related to the work we are
 Analyze git diff to understand scope:
 
 ```bash
-git diff origin/dev --name-only
+git diff origin/{{MAIN_BRANCH}} --name-only
 ```
 
 Categorize changes:
@@ -68,7 +67,7 @@ For each doc needing updates:
 1. Read current version
 2. Identify outdated sections
 3. Update with current information
-4. Run `yarn lint:md:fix`
+4. Run `{{LINT_MD_FIX_COMMAND}}` (skip if this project doesn't lint markdown)
 5. Add to current commit
 
 ## Workflow
@@ -88,3 +87,10 @@ For each doc needing updates:
 - ✅ Documentation stays current
 
 This ensures agentic team has accurate, up-to-date information to work effectively.
+
+## Customization Guide
+
+| Placeholder | Description | Example |
+| --- | --- | --- |
+| `{{MAIN_BRANCH}}` | Your integration/trunk branch | `main`, `dev` |
+| `{{LINT_MD_FIX_COMMAND}}` | Your markdown auto-fix command (omit step 4 if none) | `npm run lint:md:fix` |

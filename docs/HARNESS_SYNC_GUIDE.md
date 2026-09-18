@@ -69,6 +69,14 @@ identity:
 
 Done. Your harness is updated and your project identity is preserved.
 
+### 6. If you're retrofitting an existing repo (not starting from "Use this template")
+
+A couple of things only come for free when a repo is created via GitHub's "Use this template" button, because they live outside `.claude/` (and `sync_scope` can only ever cover `.claude/`, `.gemini/`, `.codex/`, `.cursor/`, `.agents/`, `dark-factory/` — release-tier paths like `.github/` are deliberately out of scope, see "Scope Contract" below). If you're adding this harness to a repo that already existed, do these once by hand:
+
+- Copy `.github/pull_request_template.md` from this repo into yours. `.claude/commands/pre-pr.md` checks for it.
+- Fill in the optional command-string identity keys your commands actually reference (`CI_VALIDATE_COMMAND`, `PACKAGE_MANAGER`, `LINT_MD_COMMAND`, etc. — see "Command-string identity keys" under the `identity` section below) so `pre-pr.md` and friends aren't left with unfilled `{{TOKENS}}`.
+- The first time you hand-customize a command file beyond what substitution covers (most commonly `pre-pr.md`), add its path to your manifest's `protected` list — the same way `CLAUDE.md` is protected in every example manifest — so the next sync doesn't clobber your customization with generic template text. This is the single most common way forks silently drift from a working state: a command gets manually fixed once, sync runs again later, and the fix is quietly overwritten because it was never protected.
+
 ---
 
 ## How It Works

@@ -18,7 +18,7 @@ Verify:
 
 - Current branch follows `{{TICKET_PREFIX}}-{number}-{description}` format
 - No uncommitted changes (or document what's uncommitted)
-- Branch relationship to origin/dev
+- Branch relationship to origin/{{MAIN_BRANCH}}
 
 ### 2. Linear Ticket Connection
 
@@ -41,7 +41,7 @@ Verify:
 Review commits since dev:
 
 ```bash
-git log origin/dev..HEAD --oneline
+git log origin/{{MAIN_BRANCH}}..HEAD --oneline
 ```
 
 Verify:
@@ -56,7 +56,7 @@ Check if branch needs rebasing:
 
 ```bash
 git fetch origin
-git log HEAD..origin/dev --oneline
+git log HEAD..origin/{{MAIN_BRANCH}} --oneline
 ```
 
 Report:

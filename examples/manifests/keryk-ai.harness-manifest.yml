@@ -41,7 +41,11 @@ identity:
   STAGING_CONTAINER: "scaleforge-staging"
   CONTAINER_REGISTRY: "ghcr.io/keryk-ai"
 
-substitutions: {}
+# Command-string tokens referenced by pre-pr.md and friends, outside the
+# standard identity fields. ScaleForge is a Node/TypeScript + npm project.
+substitutions:
+  CI_VALIDATE_COMMAND: "npm run typecheck && npm run lint && npm test"
+  PACKAGE_MANAGER: "npm"
 
 # Keryk AI renamed several files and one skill directory.
 renames:
@@ -60,6 +64,10 @@ protected:
   - "settings.local.json"
   # Custom agent not present in upstream
   - "agents/ml-ops-engineer.md"
+  # Hand-customized once real CI_VALIDATE_COMMAND/PACKAGE_MANAGER substitution
+  # wasn't enough (e.g. dropped the markdown-lint step entirely) — protect it
+  # so the next sync doesn't revert that customization.
+  - "commands/pre-pr.md"
 
 # Files that exist upstream but Keryk AI has completely rewritten.
 replaced:

@@ -3,7 +3,7 @@ description: Deploy latest Docker image to {{DEV_MACHINE}} dev environment
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ---
 
-> **📋 TEMPLATE**: This command is a template. See "Customization Guide" below to adapt for your infrastructure.
+> **📋 TEMPLATE — infra-dependent**: This command assumes you deploy to a remote server over SSH with Docker Compose. If your project doesn't have that infrastructure yet (e.g. it deploys via a platform like Vercel/Cloudflare, or hasn't set up deployment at all), this command doesn't apply — don't treat it as a pending TODO, delete it or leave it unfilled until you actually have matching infrastructure. See "Customization Guide" below if you do.
 
 > **DEPRECATED**: This command is an alias to `/remote-deploy`. Use `/remote-deploy` directly.
 

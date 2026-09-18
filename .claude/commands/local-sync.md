@@ -3,9 +3,9 @@ description: Full local development sync after git pull
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ---
 
-> **📋 TEMPLATE**: This command is a template. See "Customization Guide" below to adapt for your infrastructure.
+> **📋 TEMPLATE**: This command is a template written against a specific example stack (Prisma + Docker Compose + Slack notifications, package manager yarn, integration branch `dev`). Adapt or delete steps 5/6/8 and the Notes section if your stack differs — don't leave them as dead prescriptive steps. Once customized, add `.claude/commands/local-sync.md` to your manifest's `protected` (or `replaced`) list so a future sync doesn't overwrite it.
 
-Perform complete local development environment sync after pulling from dev branch.
+Perform complete local development environment sync after pulling from the main branch.
 This ensures dependencies, database, and validation are all up-to-date.
 
 ## Workflow
@@ -22,22 +22,22 @@ echo "Current branch: $CURRENT_BRANCH"
 **If on feature branch:**
 
 - Check for uncommitted changes
-- If clean, switch to dev: `git checkout dev`
-- If dirty, offer to stash: `git stash && git checkout dev`
+- If clean, switch to dev: `git checkout {{MAIN_BRANCH}}`
+- If dirty, offer to stash: `git stash && git checkout {{MAIN_BRANCH}}`
 - Save feature branch name for cleanup
 
 **Switch to dev branch:**
 
 ```bash
-git checkout dev
+git checkout {{MAIN_BRANCH}}
 ```
 
 ### 2. Git Pull
 
-Pull latest changes from origin/dev:
+Pull latest changes from origin/{{MAIN_BRANCH}}:
 
 ```bash
-git pull origin dev
+git pull origin {{MAIN_BRANCH}}
 ```
 
 If pull fails due to uncommitted changes:
@@ -54,7 +54,7 @@ If pull fails due to uncommitted changes:
 
 ```bash
 # If we switched from a feature branch, check if it's merged
-git branch --merged dev | grep -v "^\*" | grep -v "dev" | grep -v "master"
+git branch --merged {{MAIN_BRANCH}} | grep -v "^\*" | grep -v "{{MAIN_BRANCH}}"
 ```
 
 **Offer to delete merged feature branch:**
@@ -152,12 +152,12 @@ If `$SCHEMA_CHANGED` is empty:
 
 #### Only run if user opts in
 
-Ask user: "Run full validation (yarn ci:validate)? This takes ~30s. (y/N)"
+Ask user: "Run full validation ({{CI_VALIDATE_COMMAND}})? This takes ~30s. (y/N)"
 
 If user chooses Yes:
 
 ```bash
-yarn ci:validate
+{{CI_VALIDATE_COMMAND}}
 ```
 
 This runs:
@@ -169,7 +169,7 @@ This runs:
 If user chooses No or skips:
 
 ```text
-⏭️  Skipped: Run 'yarn ci:validate' manually if needed
+⏭️  Skipped: Run '{{CI_VALIDATE_COMMAND}}' manually if needed
 ```
 
 ### 8. Docker Services Check
@@ -221,7 +221,7 @@ Validation
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Status:        ⏭️  Skipped (user opted out)
-Suggestion:    Run `yarn ci:validate` manually if needed
+Suggestion:    Run `{{CI_VALIDATE_COMMAND}}` manually if needed
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Docker Services ({{TICKET_PREFIX}}-401: STANDARD Ports)
@@ -287,7 +287,7 @@ npx prisma validate
 npx prisma generate --force
 ```
 
-### ci:validate Fails
+### CI Validation Fails
 
 If validation fails, show specific failures:
 
@@ -330,14 +330,14 @@ Options:
 - `/local-restart` - Restart Docker services
 - `/local-logs` - View application logs
 - `yarn dev` - Start development server
-- `yarn ci:validate` - Run validation manually
+- `{{CI_VALIDATE_COMMAND}}` - Run validation manually
 
 ## Notes
 
 **When to Run**:
 
 - After receiving Slack notification in `#github-feed` ({{TICKET_PREFIX}}-411)
-- After every `git pull origin dev`
+- After every `git pull origin {{MAIN_BRANCH}}`
 - When switching branches
 - After long periods away from project
 - When seeing unexpected errors
@@ -375,3 +375,8 @@ To adapt this command for your infrastructure, replace these placeholders:
 | Placeholder       | Description               | Example               |
 | ----------------- | ------------------------- | --------------------- |
 | `{{TICKET_PREFIX}}` | Your Linear ticket prefix | `WOR`, `PROJ`, `TASK` |
+| `{{MAIN_BRANCH}}` | Your integration/trunk branch | `main`, `dev` |
+| `{{CI_VALIDATE_COMMAND}}` | Your combined validation command | `npm run ci:validate` |
+| `{{PROJECT_NAME}}` | Your project name (used in Docker container filters) | `RenderTrust` |
+
+Steps 5, 6, and 8 assume yarn + Prisma + Docker Compose specifically — rewrite or delete them if your stack differs.

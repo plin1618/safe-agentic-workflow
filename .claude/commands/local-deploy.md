@@ -73,7 +73,7 @@ docker inspect {{PROJECT_NAME}}-dev-app 2>/dev/null | grep 'org.opencontainers.i
 Get latest commit from dev branch:
 
 ```bash
-git log origin/dev -1 --format='%h %s'
+git log origin/{{MAIN_BRANCH}} -1 --format='%h %s'
 ```
 
 Report pre-deployment state showing:
