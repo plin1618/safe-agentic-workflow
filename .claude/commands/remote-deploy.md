@@ -7,7 +7,7 @@ allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 
 Deploy the latest Docker image to your remote staging environment.
 
-> **📋 TEMPLATE**: This command is a template. See "Customization Guide" below to adapt for your infrastructure.
+> **📋 TEMPLATE — infra-dependent**: This command assumes you deploy to a remote server over SSH with Docker Compose. If your project doesn't have that infrastructure yet (e.g. it deploys via a platform like Vercel/Cloudflare, or hasn't set up deployment at all), this command doesn't apply — don't treat it as a pending TODO, delete it or leave it unfilled until you actually have matching infrastructure. See "Customization Guide" below if you do.
 
 ## Quick Deploy Command
 

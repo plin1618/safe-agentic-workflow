@@ -6,7 +6,7 @@ allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 
 View logs from the remote development environment containers.
 
-> **📋 TEMPLATE**: This command is a template. Replace placeholders with your infrastructure values before use. See the **Customization Guide** at the bottom.
+> **📋 TEMPLATE — infra-dependent**: This command assumes you deploy to a remote server over SSH with Docker Compose. If your project doesn't have that infrastructure yet (e.g. it deploys via a platform like Vercel/Cloudflare, or hasn't set up deployment at all), this command doesn't apply — don't treat it as a pending TODO, delete it or leave it unfilled until you actually have matching infrastructure. See the **Customization Guide** at the bottom if you do.
 
 ## Workflow
 

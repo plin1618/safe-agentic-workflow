@@ -4,7 +4,7 @@ argument-hint: [{{TICKET_PREFIX}}-number]
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ---
 
-> **📋 TEMPLATE**: This command is a template. See "Customization Guide" below to adapt for your infrastructure.
+> **📋 TEMPLATE**: This command is a template. See "Customization Guide" below to adapt for your infrastructure. Once customized, add `.claude/commands/quick-fix.md` to your manifest's `protected` (or `replaced`) list so a future sync doesn't overwrite it.
 
 Execute streamlined workflow for small, urgent bug fixes that need fast turnaround.
 
@@ -58,9 +58,9 @@ git commit -m "fix(scope): resolve {issue} [{{TICKET_PREFIX}}-XXX]"
 Run essential checks only:
 
 ```bash
-yarn type-check  # TypeScript
-yarn lint        # ESLint
-yarn test:unit   # Fast tests only
+{{TYPE_CHECK_COMMAND}}  # TypeScript
+{{LINT_COMMAND}}        # ESLint
+{{TEST_UNIT_COMMAND}}   # Fast tests only
 ```
 
 **Skip** if time-critical:
@@ -72,7 +72,7 @@ yarn test:unit   # Fast tests only
 ### 4. Quick PR
 
 ```bash
-git fetch origin && git rebase origin/dev
+git fetch origin && git rebase origin/{{MAIN_BRANCH}}
 git push --force-with-lease origin {branch}
 ```
 
@@ -153,3 +153,5 @@ To adapt this command for your infrastructure, replace these placeholders:
 | Placeholder       | Description               | Example               |
 | ----------------- | ------------------------- | --------------------- |
 | `{{TICKET_PREFIX}}` | Your Linear ticket prefix | `WOR`, `PROJ`, `TASK` |
+| `{{MAIN_BRANCH}}` | Your integration/trunk branch | `main`, `dev` |
+| `{{TYPE_CHECK_COMMAND}}` / `{{LINT_COMMAND}}` / `{{TEST_UNIT_COMMAND}}` | Your project's individual quality-check commands | `npm run typecheck` |

@@ -14,7 +14,7 @@ Execute dependency audit to identify optimization opportunities and security iss
 Check for vulnerabilities:
 
 ```bash
-yarn audit
+{{PACKAGE_MANAGER}} audit
 ```
 
 Report:
@@ -28,7 +28,7 @@ Report:
 Run bundle analyzer:
 
 ```bash
-ANALYZE=true yarn build
+ANALYZE=true {{PACKAGE_MANAGER}} run build
 ```
 
 Identify:
@@ -56,7 +56,7 @@ Find:
 Check for updates:
 
 ```bash
-yarn outdated
+{{PACKAGE_MANAGER}} outdated
 ```
 
 Report:
@@ -203,3 +203,4 @@ To adapt this command for your infrastructure, replace these placeholders:
 | Placeholder       | Description               | Example               |
 | ----------------- | ------------------------- | --------------------- |
 | `{{TICKET_PREFIX}}` | Your Linear ticket prefix | `WOR`, `PROJ`, `TASK` |
+| `{{PACKAGE_MANAGER}}` | Your project's package manager | `npm`, `yarn`, `pnpm` |

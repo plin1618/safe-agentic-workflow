@@ -41,18 +41,29 @@ identity:
   STAGING_CONTAINER: "rendertrust-staging"
   CONTAINER_REGISTRY: "ghcr.io/bybren-llc"
 
-# Substitutions are derived from identity above.
-# Only override here if a derived value needs to differ from the automatic
-# computation (e.g., TICKET_PREFIX_LOWER != lowercase of TICKET_PREFIX).
-substitutions: {}
+# Substitutions are derived from identity above, plus any custom tokens
+# referenced by command files (e.g. pre-pr.md, local-sync.md, quick-fix.md)
+# that aren't part of the standard 22 identity fields. RenderTrust is
+# Python/FastAPI, so its validation commands look nothing like the
+# yarn/TypeScript examples baked into the upstream command prose.
+substitutions:
+  CI_VALIDATE_COMMAND: "ruff check . && mypy . && pytest"
+  PACKAGE_MANAGER: "poetry"
+  TYPE_CHECK_COMMAND: "mypy ."
+  LINT_COMMAND: "ruff check ."
+  TEST_UNIT_COMMAND: "pytest"
 
 # RenderTrust uses the upstream file structure unchanged.
 renames: {}
 
 # Files that RenderTrust owns and should never be overwritten by sync.
+# CLAUDE.md and pre-pr.md are the two files nearly every fork ends up
+# hand-customizing beyond what substitution covers (see HARNESS_SYNC_GUIDE.md
+# "If you're retrofitting an existing repo") — protect them as soon as you do.
 protected:
   - "hooks-config.json"
   - "team-config.json"
+  - "commands/pre-pr.md"
 
 # Files that RenderTrust has completely rewritten from the upstream template.
 # The sync script will warn (but not overwrite) if upstream changes these.

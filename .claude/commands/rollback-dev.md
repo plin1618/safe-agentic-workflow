@@ -4,7 +4,7 @@ argument-hint: [commit-sha]
 allowed-tools: [Read, Write, Edit, Bash, Grep, Glob]
 ---
 
-> **📋 TEMPLATE**: This command is a template. See "Customization Guide" below to adapt for your infrastructure.
+> **📋 TEMPLATE — infra-dependent**: This command assumes you deploy to a remote server over SSH with Docker Compose. If your project doesn't have that infrastructure yet (e.g. it deploys via a platform like Vercel/Cloudflare, or hasn't set up deployment at all), this command doesn't apply — don't treat it as a pending TODO, delete it or leave it unfilled until you actually have matching infrastructure. See "Customization Guide" below if you do.
 
 Rollback the {{DEV_MACHINE}} dev environment to a previous Docker image version.
 
@@ -38,7 +38,7 @@ ssh -i {{SSH_KEY_PATH}} {{REMOTE_USER}}@{{REMOTE_HOST}} "docker images {{REGISTR
 Cross-reference with git commits to show messages:
 
 ```bash
-git log origin/dev -10 --oneline
+git log origin/{{MAIN_BRANCH}} -10 --oneline
 ```
 
 ### 3. Select Rollback Target
