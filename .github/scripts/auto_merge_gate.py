@@ -126,7 +126,51 @@ def check_qas_approved(ticket_id: str | None) -> bool:
     if not issue:
         return False
     comments = issue.get("comments", {}).get("nodes", [])
-    return any("Approved for RTE" in (c.get("body") or "") for c in comments)
+    return any(_has_qas_approval(c.get("body") or "") for c in comments)
+
+
+# 2026-08-27: the single exact string "Approved for RTE" turned out to be far
+# stricter than QAS's actual sign-off vocabulary in practice -- a real audit
+# of 12 genuinely QAS-passed PRs on a live SAW-adopting repo found only 2
+# used that literal phrase; the rest closed with "approved for merge",
+# "Ready for RTE", "Verdict: APPROVED", a lowercase "approved for RTE", or a
+# standalone "**Approved.**". This gate is meant to recognize what QAS
+# actually writes, not force QAS to memorize one incantation. Widened to a
+# small set of unambiguous, case-insensitive phrasings, each checked for a
+# nearby negation ("not approved for merge", "isn't approved yet") so a
+# comment describing what ISN'T true yet can't flip this true. Deliberately
+# conservative: a genuine approval phrased some other way still fails closed
+# (no auto-merge) rather than risk a false positive on a conditional/negated
+# approval -- see check_qas_approved's fail-closed philosophy in the module
+# docstring.
+_QAS_APPROVAL_PHRASES = (
+    "approved for rte",
+    "ready for rte",
+    "clear for rte",
+    "approved for merge",
+    "verdict: approved",
+    "verdict: pass",
+)
+_QAS_APPROVAL_STANDALONE = re.compile(r"\*\*approved\.?\*\*", re.IGNORECASE)
+_NEGATION_WORDS = ("not ", "n't ", "never ", "isn't", "wasn't", "cannot ", "can't ")
+_NEGATION_LOOKBACK_CHARS = 30
+
+
+def _has_qas_approval(body: str) -> bool:
+    if _QAS_APPROVAL_STANDALONE.search(body):
+        return True
+    lower = body.lower()
+    for phrase in _QAS_APPROVAL_PHRASES:
+        start = 0
+        while True:
+            idx = lower.find(phrase, start)
+            if idx == -1:
+                break
+            preceding = lower[max(0, idx - _NEGATION_LOOKBACK_CHARS) : idx]
+            if not any(neg in preceding for neg in _NEGATION_WORDS):
+                return True
+            start = idx + len(phrase)
+    return False
 
 
 def check_gate_denylist(pr: dict) -> bool:
