@@ -73,8 +73,8 @@ Based on work status:
 Use Linear MCP:
 
 ```text
-mcp__{{MCP_LINEAR_SERVER}}__update_issue
-mcp__{{MCP_LINEAR_SERVER}}__create_comment
+mcp__{{MCP_LINEAR_SERVER}}__save_issue
+mcp__{{MCP_LINEAR_SERVER}}__save_comment
 ```
 
 ### 5. Context Preservation

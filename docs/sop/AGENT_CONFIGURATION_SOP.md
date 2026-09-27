@@ -166,8 +166,8 @@ tools:
     Read,
     Bash,
     Grep,
-    mcp__{{MCP_LINEAR_SERVER}}__create_comment,
-    mcp__{{MCP_LINEAR_SERVER}}__update_issue,
+    mcp__{{MCP_LINEAR_SERVER}}__save_comment,
+    mcp__{{MCP_LINEAR_SERVER}}__save_issue,
     mcp__{{MCP_LINEAR_SERVER}}__list_comments,
   ]
 model: opus
@@ -255,6 +255,10 @@ a rule this document can assert.
 - ✅ TDM - Orchestration and progress updates
 - ✅ QAS (v1.4) - Evidence posting and verdict (Gate Owner role - system of record)
 - ❌ Execution agents - No direct Linear access (reduces noise)
+
+**⚠️ Server capability requirement**: The tool names baked into this harness (`save_issue`, `save_comment`, `list_comments`, `get_issue`, `get_team`, `list_teams`, `list_issue_statuses`) assume `{{MCP_LINEAR_SERVER}}` is a **full-featured** Linear MCP server/connector that exposes combined create-or-update `save_*` calls and a comment-read call. They do **not** match the minimal `@anthropic/linear-mcp-server` npx package, which instead exposes `linear_add_comment`, `linear_update_issue`, `linear_create_issue`, `linear_search_issues`, `linear_get_user_issues` — and has no comment-read tool at all, so QAS cannot read prior comments through it under any naming fix.
+
+Before running `setup-template.sh`, confirm which Linear MCP server/connector the project will actually use and verify its real tool names (e.g. via `/mcp` or `claude mcp list` in an interactive session) instead of assuming the placeholder substitution alone makes these calls work. If the project is stuck with the minimal npx server, either swap it for a fuller Linear connector, or scope QAS/TDM/BSA's `tools:` arrays down to only the calls that server actually supports and drop the comment-read step.
 
 **Confluence MCP** (`mcp__{{MCP_CONFLUENCE_SERVER}}__*`):
 

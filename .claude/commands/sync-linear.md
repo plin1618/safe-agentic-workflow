@@ -72,7 +72,7 @@ Based on work analysis:
 Use Linear MCP to update:
 
 ```text
-mcp__{{MCP_LINEAR_SERVER}}__update_issue
+mcp__{{MCP_LINEAR_SERVER}}__save_issue
 ```
 
 Update fields:
@@ -117,7 +117,7 @@ Create detailed comment:
 Add comment via:
 
 ```text
-mcp__{{MCP_LINEAR_SERVER}}__create_comment
+mcp__{{MCP_LINEAR_SERVER}}__save_comment
 ```
 
 ### 6. Link Related Items

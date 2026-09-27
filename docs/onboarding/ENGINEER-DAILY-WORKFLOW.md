@@ -336,11 +336,11 @@ git push --force-with-lease origin {{TICKET_PREFIX}}-XXX-your-feature
 
 # Your exit state as an implementer is "Ready for QAS"
 # Update the Linear ticket
-mcp__{{MCP_LINEAR_SERVER}}__update_issue \
+mcp__{{MCP_LINEAR_SERVER}}__save_issue \
   --issue_id "{{TICKET_PREFIX}}-XXX" \
   --state "Testing"
 
-mcp__{{MCP_LINEAR_SERVER}}__create_comment \
+mcp__{{MCP_LINEAR_SERVER}}__save_comment \
   --issue_id "{{TICKET_PREFIX}}-XXX" \
   --body "Implementation complete. All validation checks passing. Exit State: Ready for QAS.\n\nSession ID: [session-id]"
 ```
@@ -362,7 +362,7 @@ mcp__{{MCP_LINEAR_SERVER}}__create_comment \
 - [ ] Linear ticket has a progress comment:
 
 ```bash
-mcp__{{MCP_LINEAR_SERVER}}__create_comment \
+mcp__{{MCP_LINEAR_SERVER}}__save_comment \
   --issue_id "{{TICKET_PREFIX}}-XXX" \
   --body "End-of-day update: API endpoint implemented, unit tests written (6/6 passing). Integration tests pending. Will resume next session. Session ID: [session-id]"
 ```

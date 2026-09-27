@@ -219,18 +219,18 @@ Use Linear MCP tools to post evidence directly to the ticket:
 
 ```bash
 # Add QAS validation report as a comment on the Linear ticket
-mcp__{{MCP_LINEAR_SERVER}}__create_comment \
+mcp__{{MCP_LINEAR_SERVER}}__save_comment \
   --issue_id "{{TICKET_PREFIX}}-XXX" \
   --body "## QAS Validation Report\n\n[Full evidence report here]"
 
 # Update ticket state based on result
 # If APPROVED:
-mcp__{{MCP_LINEAR_SERVER}}__update_issue \
+mcp__{{MCP_LINEAR_SERVER}}__save_issue \
   --issue_id "{{TICKET_PREFIX}}-XXX" \
   --state "Ready for Review"
 
 # If REJECTED:
-mcp__{{MCP_LINEAR_SERVER}}__update_issue \
+mcp__{{MCP_LINEAR_SERVER}}__save_issue \
   --issue_id "{{TICKET_PREFIX}}-XXX" \
   --state "In Progress"
 ```
@@ -258,12 +258,12 @@ mcp__{{MCP_LINEAR_SERVER}}__get_issue_history "{{TICKET_PREFIX}}-XXX"
 
 ```bash
 # Post progress update
-mcp__{{MCP_LINEAR_SERVER}}__create_comment \
+mcp__{{MCP_LINEAR_SERVER}}__save_comment \
   --issue_id "{{TICKET_PREFIX}}-XXX" \
   --body "QAS testing in progress. Unit tests complete (12/12 passing). Starting integration tests."
 
 # Post final approval
-mcp__{{MCP_LINEAR_SERVER}}__create_comment \
+mcp__{{MCP_LINEAR_SERVER}}__save_comment \
   --issue_id "{{TICKET_PREFIX}}-XXX" \
   --body "## QAS Gate: APPROVED\n\nAll ACs validated. Exit State: Approved for RTE.\n\nSession ID: [session-id]"
 ```
@@ -272,12 +272,12 @@ mcp__{{MCP_LINEAR_SERVER}}__create_comment \
 
 ```bash
 # Testing complete, approved → move to Ready for Review
-mcp__{{MCP_LINEAR_SERVER}}__update_issue \
+mcp__{{MCP_LINEAR_SERVER}}__save_issue \
   --issue_id "{{TICKET_PREFIX}}-XXX" \
   --state "Ready for Review"
 
 # Testing failed → return to In Progress with explanation
-mcp__{{MCP_LINEAR_SERVER}}__update_issue \
+mcp__{{MCP_LINEAR_SERVER}}__save_issue \
   --issue_id "{{TICKET_PREFIX}}-XXX" \
   --state "In Progress"
 ```
@@ -306,7 +306,7 @@ Before ending your session, run through this checklist:
 Post a summary comment on any ticket still in progress:
 
 ```bash
-mcp__{{MCP_LINEAR_SERVER}}__create_comment \
+mcp__{{MCP_LINEAR_SERVER}}__save_comment \
   --issue_id "{{TICKET_PREFIX}}-XXX" \
   --body "QAS end-of-day update: Integration tests complete (8/8 passing). E2E tests pending - will resume next session. Session ID: [session-id]"
 ```

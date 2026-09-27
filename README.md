@@ -659,9 +659,9 @@ Note: Quality gates are immutable. QAS and SecEng cannot be collapsed.
                         │                                 │
                         │  Tools (Linear MCP):            │
                         │  • mcp__{{MCP_LINEAR_SERVER}}__            │
-                        │      create_comment             │
+                        │      save_comment             │
                         │  • mcp__{{MCP_LINEAR_SERVER}}__            │
-                        │      update_issue               │
+                        │      save_issue               │
                         │  • mcp__{{MCP_LINEAR_SERVER}}__            │
                         │      list_comments              │
                         └────────────┬────────────────────┘
@@ -983,8 +983,8 @@ Legend:
 │                                                                             │
 │  LINEAR MCP TOOLS:                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  • mcp__{{MCP_LINEAR_SERVER}}__create_comment  (post evidence)                 │   │
-│  │  • mcp__{{MCP_LINEAR_SERVER}}__update_issue    (update status)                 │   │
+│  │  • mcp__{{MCP_LINEAR_SERVER}}__save_comment  (post evidence)                 │   │
+│  │  • mcp__{{MCP_LINEAR_SERVER}}__save_issue    (update status)                 │   │
 │  │  • mcp__{{MCP_LINEAR_SERVER}}__list_comments   (read context)                  │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │

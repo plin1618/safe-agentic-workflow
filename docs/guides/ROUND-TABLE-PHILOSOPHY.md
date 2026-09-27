@@ -171,7 +171,7 @@ No ticket moves to "Ready for Review" without evidence. This is enforced by the 
 | Performance data     | Benchmarks for performance-sensitive changes             | Tagged   |
 | Security scan        | Security audit output for `#EXPORT_CRITICAL` features    | Tagged   |
 
-Evidence is attached to the Linear ticket as comments using the `mcp__{{MCP_LINEAR_SERVER}}__create_comment` tool.
+Evidence is attached to the Linear ticket as comments using the `mcp__{{MCP_LINEAR_SERVER}}__save_comment` tool.
 
 ### POPM Approval Process
 

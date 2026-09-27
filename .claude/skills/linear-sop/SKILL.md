@@ -51,7 +51,7 @@ mcp__{{MCP_LINEAR_SERVER}}__create_issue({
 ### Updating Issues
 
 ```text
-mcp__{{MCP_LINEAR_SERVER}}__update_issue({
+mcp__{{MCP_LINEAR_SERVER}}__save_issue({
   id: "{{TICKET_PREFIX}}-459",
   state: "Done",
 })
@@ -60,7 +60,7 @@ mcp__{{MCP_LINEAR_SERVER}}__update_issue({
 ### Adding Comments
 
 ```text
-mcp__{{MCP_LINEAR_SERVER}}__create_comment({
+mcp__{{MCP_LINEAR_SERVER}}__save_comment({
   issueId: "{{TICKET_PREFIX}}-459",
   body: "**Dev Evidence**\n\n...",
 })

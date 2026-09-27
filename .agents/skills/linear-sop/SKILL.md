@@ -54,7 +54,7 @@ create_issue({
 ### Updating Issues
 
 ```text
-update_issue({
+save_issue({
   id: "{{TICKET_PREFIX}}-459",
   state: "Done",
 })
@@ -63,7 +63,7 @@ update_issue({
 ### Adding Comments
 
 ```text
-create_comment({
+save_comment({
   issueId: "{{TICKET_PREFIX}}-459",
   body: "**Dev Evidence**\n\n...",
 })

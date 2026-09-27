@@ -6,8 +6,8 @@ tools:
     Read,
     Bash,
     Grep,
-    mcp__{{MCP_LINEAR_SERVER}}__create_comment,
-    mcp__{{MCP_LINEAR_SERVER}}__update_issue,
+    mcp__{{MCP_LINEAR_SERVER}}__save_comment,
+    mcp__{{MCP_LINEAR_SERVER}}__save_issue,
     mcp__{{MCP_LINEAR_SERVER}}__list_comments,
   ]
 model: opus
@@ -70,7 +70,7 @@ Validates acceptance criteria and ensures quality standards are met.
 
 ```text
 # Post evidence to Linear ticket
-Use mcp__{{MCP_LINEAR_SERVER}}__create_comment with:
+Use mcp__{{MCP_LINEAR_SERVER}}__save_comment with:
 - issueId: {{TICKET_PREFIX}}-{number}
 - body: QA validation report with:
   - Validation results (PASS/FAIL per criterion)
@@ -309,7 +309,7 @@ Before approving work:
 
 3. **Linear Evidence Posted**
    - [ ] QA report created at `/docs/agent-outputs/qa-validations/{{TICKET_PREFIX}}-{number}-qa-validation.md`
-   - [ ] Final verdict posted to Linear comments via `mcp__{{MCP_LINEAR_SERVER}}__create_comment`
+   - [ ] Final verdict posted to Linear comments via `mcp__{{MCP_LINEAR_SERVER}}__save_comment`
 
 4. **Handoff Statement**
    > "QAS validation complete for {{TICKET_PREFIX}}-XXX. All criteria PASSED. Evidence posted to Linear. Approved for RTE."
